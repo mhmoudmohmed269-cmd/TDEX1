@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>محدد الموقع المباشر | Live Location Tracker</title>
+    
+    <!-- SEO Meta Tags -->
+    <meta name="description" content="تطبيق ويب لمعرفة موقعك الحالي بالتفصيل مباشرةً بمجرد الدخول.">
+    <meta name="theme-color" content="#0f172a">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Leaflet CSS for Map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="background-blobs">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
+    </div>
+
+    <main class="container">
+        <header class="app-header">
+            <h1 class="gradient-text">محدد الموقع الذكي</h1>
+            <p class="subtitle">يتم تحديد موقعك بدقة وبشكل مباشر...</p>
+        </header>
+
+        <div class="glass-card">
+            <!-- Loading State -->
+            <div id="loadingState" class="state-container active">
+                <div class="radar-spinner">
+                    <div class="circle"></div>
+                    <div class="circle"></div>
+                    <div class="circle"></div>
+                    <div class="dot"></div>
+                </div>
+                <h2 id="loadingText">جاري تحديد الموقع...</h2>
+                <p>يرجى السماح للمتصفح بالوصول إلى موقعك</p>
+            </div>
+
+            <!-- Error State -->
+            <div id="errorState" class="state-container hidden">
+                <div class="error-icon">⚠️</div>
+                <h2>تعذر تحديد الموقع</h2>
+                <p id="errorMessage">يرجى التأكد من تفعيل خدمة الموقع والسماح للمتصفح بالوصول إليها.</p>
+                <button id="retryBtn" class="primary-btn">حاول مرة أخرى</button>
+            </div>
+
+            <!-- Result State -->
+            <div id="resultState" class="state-container hidden">
+                <div class="result-grid">
+                    <div class="details-section">
+                        <div class="detail-item">
+                            <span class="detail-label">البلد</span>
+                            <span class="detail-value" id="resCountry">--</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">المدينة / المنطقة</span>
+                            <span class="detail-value" id="resCity">--</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">الشارع / الحي</span>
+                            <span class="detail-value" id="resStreet">--</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">خط العرض</span>
+                            <span class="detail-value coordinates" id="resLat">--</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">خط الطول</span>
+                            <span class="detail-value coordinates" id="resLon">--</span>
+                        </div>
+                    </div>
+                    <div class="map-section">
+                        <div id="map"></div>
+                    </div>
+                </div>
+                
+                <div class="full-address-box">
+                    <h3>العنوان بالكامل</h3>
+                    <p id="resFullAddress">--</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Socket.IO JS -->
+    <script src="/socket.io/socket.io.js"></script>
+    
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    
+    <!-- Custom JS -->
+    <script src="script.js"></script>
+</body>
+</html>
