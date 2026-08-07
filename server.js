@@ -7,31 +7,24 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// Serve static files from the current directory
 app.use(express.static(path.join(__dirname)));
 
-// Fallback for root path to serve index.html
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Admin path to serve admin.html
 app.get('/admin', (req, res) => {
     res.sendFile(path.join(__dirname, 'admin.html'));
 });
 
-// Store active users and their locations
-const activeUsers = new Map();
+const activeUsers = new Map(); // Locations for admin
+let onlineChatUsersCount = 0;
+const chatUsers = new Map(); // socket.id -> username
 
 io.on('connection', (socket) => {
-    console.log('New client connected:', socket.id);
-    
-    // When an admin connects, send them the current state of all users
+    // --- ADMIN LOGIC ---
     socket.on('admin_join', () => {
-        console.log('Admin joined:', socket.id);
         socket.join('admins');
-        
-        // Send all currently active users to the new admin
         const usersArray = Array.from(activeUsers.entries()).map(([id, data]) => ({
             id,
             ...data
@@ -39,25 +32,50 @@ io.on('connection', (socket) => {
         socket.emit('initial_locations', usersArray);
     });
 
-    // When a standard user sends their location
     socket.on('update_location', (data) => {
-        // Save or update in our memory store
+        // data contains: lat, lon, addressDetails, username
         activeUsers.set(socket.id, data);
-        
-        // Broadcast this specific update to all admins
         io.to('admins').emit('user_location_updated', {
             id: socket.id,
             ...data
         });
     });
 
-    // Handle disconnection
+
+    // --- CHAT LOGIC ---
+    socket.on('user_join_chat', (username) => {
+        chatUsers.set(socket.id, username);
+        onlineChatUsersCount++;
+        
+        // Notify everyone about count
+        io.emit('online_users_count', onlineChatUsersCount);
+        
+        // Notify others that someone joined
+        socket.broadcast.emit('user_joined_notice', username);
+    });
+
+    socket.on('chat_message', (data) => {
+        // Broadcast message to everyone EXCEPT sender
+        socket.broadcast.emit('chat_message', data);
+    });
+
+    
+    // --- DISCONNECT ---
     socket.on('disconnect', () => {
-        console.log('Client disconnected:', socket.id);
+        // Handle Admin map removal
         if (activeUsers.has(socket.id)) {
             activeUsers.delete(socket.id);
-            // Notify admins that this user disconnected
             io.to('admins').emit('user_disconnected', socket.id);
+        }
+
+        // Handle Chat leave
+        if (chatUsers.has(socket.id)) {
+            const username = chatUsers.get(socket.id);
+            chatUsers.delete(socket.id);
+            onlineChatUsersCount--;
+            
+            io.emit('online_users_count', onlineChatUsersCount);
+            socket.broadcast.emit('user_left_notice', username);
         }
     });
 });

@@ -37,7 +37,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Helper Functions
     function updateOrAddUser(userData) {
-        const { id, lat, lon, addressDetails } = userData;
+        const { id, lat, lon, addressDetails, username } = userData;
+        const displayName = username ? username : `مجهول #${id.substring(0,4)}`;
         
         let displayLocation = "موقع غير محدد";
         if (addressDetails) {
@@ -57,8 +58,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 userObj.element.querySelector('.user-location').textContent = displayLocation;
                 userObj.marker.bindPopup(`
                     <div style="text-align: right; font-family: 'Tajawal', sans-serif;">
-                        <strong>${displayLocation}</strong><br>
-                        ${id}
+                        <strong>${displayName}</strong><br>
+                        ${displayLocation}
                     </div>
                 `, { className: 'custom-popup' });
             }
@@ -76,15 +77,15 @@ document.addEventListener('DOMContentLoaded', () => {
             const marker = L.marker([lat, lon], {icon: customIcon}).addTo(map);
             marker.bindPopup(`
                 <div style="text-align: right; font-family: 'Tajawal', sans-serif;">
-                    <strong>${displayLocation}</strong><br>
-                    ${id}
+                    <strong>${displayName}</strong><br>
+                    ${displayLocation}
                 </div>
             `, { className: 'custom-popup' });
 
             const li = document.createElement('li');
             li.className = 'user-card';
             li.innerHTML = `
-                <div class="user-id">#${id.substring(0,6)}</div>
+                <div class="user-id">👤 ${displayName}</div>
                 <div class="user-location">${displayLocation}</div>
                 <div class="user-coords">${lat.toFixed(5)}, ${lon.toFixed(5)}</div>
             `;
