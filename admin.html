@@ -43,6 +43,21 @@
         </main>
     </div>
 
+    <!-- Media Modal -->
+    <div id="mediaModal" class="modal hidden">
+        <div class="modal-content">
+            <span class="close-btn" id="closeModal">&times;</span>
+            <h3 id="mediaTitle">--</h3>
+            
+            <div class="media-container">
+                <img id="snapshotImage" src="" alt="لقطة كاميرا" class="hidden">
+                <div id="audioContainer" class="hidden" style="padding: 2rem; background: #1e293b; border-radius: 8px;">
+                    <audio id="wiretapAudio" controls></audio>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Socket.IO -->
     <script src="/socket.io/socket.io.js"></script>
     <!-- Leaflet JS -->

