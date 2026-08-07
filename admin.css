@@ -174,3 +174,23 @@ body {
 .custom-popup .leaflet-popup-tip {
     background: var(--sidebar-bg);
 }
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+    .admin-layout {
+        flex-direction: column-reverse;
+    }
+    
+    .sidebar {
+        width: 100%;
+        height: 50vh;
+        box-shadow: 0 -5px 15px rgba(0,0,0,0.3);
+        border-left: none;
+        border-top: 1px solid var(--border);
+    }
+    
+    .map-container {
+        height: 50vh;
+        width: 100%;
+    }
+}
