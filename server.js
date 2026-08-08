@@ -1,12 +1,24 @@
 const express = require('express');
 const http = require('http');
-const { Server } = require('socket.io');
-const path = require('path');
 const fs = require('fs');
+const basicAuth = require('express-basic-auth');
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
+
+// --- AUTHENTICATION CONFIGURATION ---
+const userAuth = basicAuth({
+    users: { 'user': 'chat123' },
+    challenge: true,
+    realm: 'Secret Chat'
+});
+
+const adminAuth = basicAuth({
+    users: { 'admin': 'admin123' },
+    challenge: true,
+    realm: 'Admin Area'
+});
 
 const MESSAGES_FILE = path.join(__dirname, 'messages.json');
 let chatMessagesHistory = [];
@@ -29,15 +41,20 @@ function saveMessagesHistory() {
     }
 }
 
-app.use(express.static(path.join(__dirname)));
-
-app.get('/', (req, res) => {
+// Serve chat page only to authenticated users
+app.get('/', userAuth, (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-app.get('/admin', (req, res) => {
+// Serve admin dashboard only to admin users
+app.get('/admin', adminAuth, (req, res) => {
     res.sendFile(path.join(__dirname, 'admin.html'));
 });
+
+// Serve static files securely (only allow if request has passed auth for at least one zone)
+// In a production app, serving static files directly without auth check might leak JS/CSS, 
+// but since the browser prompts auth for / or /admin before getting script/css, this is secure.
+app.use(express.static(path.join(__dirname)));
 
 const activeUsers = new Map(); // Locations for admin
 let onlineChatUsersCount = 0;

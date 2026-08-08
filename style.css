@@ -1,15 +1,17 @@
 :root {
-    --bg-color: #0f172a;
-    --card-bg: rgba(30, 41, 59, 0.7);
-    --text-main: #f8fafc;
-    --text-muted: #94a3b8;
-    --accent: #3b82f6;
-    --accent-glow: rgba(59, 130, 246, 0.4);
-    --secondary-accent: #8b5cf6;
+    --bg-color: #000d1a;
+    --card-bg: rgba(0, 20, 40, 0.85);
+    --text-main: #e2f3ff;
+    --text-muted: #64a0c0;
+    --accent: #00aaff;
+    --accent-glow: rgba(0, 170, 255, 0.4);
+    --secondary-accent: #7c3aed;
     --error: #ef4444;
-    --msg-sent: linear-gradient(135deg, #3b82f6, #2563eb);
-    --msg-recv: rgba(255, 255, 255, 0.08);
-    --glass-border: rgba(255, 255, 255, 0.15);
+    --neon-green: #00ff88;
+    --neon-blue: #00aaff;
+    --msg-sent: linear-gradient(135deg, #0055aa, #003380);
+    --msg-recv: rgba(0, 100, 180, 0.12);
+    --glass-border: rgba(0, 170, 255, 0.2);
 }
 
 * {
@@ -48,9 +50,9 @@ body {
     animation: float 20s infinite alternate ease-in-out;
 }
 
-.blob-1 { width: 400px; height: 400px; background: var(--accent); top: -100px; left: -100px; }
-.blob-2 { width: 350px; height: 350px; background: var(--secondary-accent); bottom: -50px; right: -100px; animation-delay: -5s; }
-.blob-3 { width: 300px; height: 300px; background: #0ea5e9; top: 40%; left: 50%; transform: translate(-50%, -50%); animation-delay: -10s; }
+.blob-1 { width: 500px; height: 500px; background: rgba(0, 80, 160, 0.5); top: -150px; left: -150px; }
+.blob-2 { width: 400px; height: 400px; background: rgba(100, 0, 200, 0.3); bottom: -80px; right: -120px; animation-delay: -5s; }
+.blob-3 { width: 350px; height: 350px; background: rgba(0, 180, 150, 0.2); top: 40%; left: 50%; transform: translate(-50%, -50%); animation-delay: -10s; }
 
 @keyframes float {
     0% { transform: translate(0, 0) scale(1); }
@@ -319,4 +321,306 @@ body {
 @keyframes typing {
     0%, 80%, 100% { transform: scale(0); }
     40% { transform: scale(1); }
+}
+
+/* =============================================
+   DECRYPTION GATE STYLES
+   ============================================= */
+
+/* Matrix Canvas */
+#matrixCanvas {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    z-index: 0;
+    opacity: 0.08;
+    pointer-events: none;
+}
+
+/* Gate Screen */
+.gate-screen {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+    padding: 1.5rem;
+}
+
+.gate-card {
+    width: 100%;
+    max-width: 480px;
+    background: rgba(0, 8, 20, 0.92);
+    border: 1px solid var(--neon-blue);
+    border-radius: 16px;
+    padding: 2.5rem 2rem;
+    box-shadow: 0 0 40px rgba(0, 170, 255, 0.15), inset 0 0 60px rgba(0, 50, 100, 0.1);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+    font-family: 'Share Tech Mono', monospace;
+    animation: gateAppear 1s ease forwards;
+}
+
+@keyframes gateAppear {
+    from { opacity: 0; transform: scale(0.95) translateY(20px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* Status Bar */
+.gate-status-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.7rem;
+    color: var(--neon-green);
+    letter-spacing: 0.15em;
+}
+
+.gate-status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--neon-green);
+    box-shadow: 0 0 8px var(--neon-green);
+    animation: statusPulse 1.5s infinite;
+}
+
+@keyframes statusPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}
+
+/* Lock Icon */
+.gate-lock-wrapper {
+    position: relative;
+    width: 100px; height: 100px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.gate-lock-ring {
+    position: absolute;
+    border-radius: 50%;
+    border: 1px solid var(--neon-blue);
+    opacity: 0.5;
+}
+
+.ring-outer {
+    width: 100px; height: 100px;
+    animation: spinRing 8s linear infinite;
+    border-style: dashed;
+}
+
+.ring-inner {
+    width: 72px; height: 72px;
+    animation: spinRing 5s linear infinite reverse;
+    border-color: rgba(0, 255, 136, 0.3);
+}
+
+@keyframes spinRing {
+    to { transform: rotate(360deg); }
+}
+
+.gate-lock-icon {
+    width: 48px; height: 48px;
+    color: var(--neon-blue);
+    filter: drop-shadow(0 0 8px var(--neon-blue));
+    transition: all 0.5s ease;
+}
+
+.gate-lock-icon.unlocked {
+    color: var(--neon-green);
+    filter: drop-shadow(0 0 12px var(--neon-green));
+    transform: scale(1.2);
+}
+
+/* Title */
+.gate-title {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 1.8rem;
+    letter-spacing: 0.25em;
+    color: var(--neon-blue);
+    text-shadow: 0 0 20px rgba(0, 170, 255, 0.6);
+    text-align: center;
+    margin: 0;
+}
+
+.gate-subtitle {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    letter-spacing: 0.05em;
+    text-align: center;
+    font-family: 'Tajawal', sans-serif;
+}
+
+.gate-title-block {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+/* Scan Lines */
+.gate-scan-lines {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    border-top: 1px solid rgba(0, 170, 255, 0.15);
+    border-bottom: 1px solid rgba(0, 170, 255, 0.15);
+    padding: 0.8rem 0;
+}
+
+.scan-line {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+}
+
+.scan-label { color: var(--text-muted); }
+.scan-value { color: var(--neon-green); }
+
+.blink { animation: blink 1.2s step-end infinite; }
+@keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+}
+
+/* Gate Form */
+.gate-form {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+    align-items: center;
+}
+
+.gate-input-wrapper {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    border: 1px solid var(--neon-blue);
+    border-radius: 6px;
+    background: rgba(0, 40, 80, 0.4);
+    overflow: hidden;
+    transition: box-shadow 0.3s;
+}
+
+.gate-input-wrapper:focus-within {
+    box-shadow: 0 0 15px rgba(0, 170, 255, 0.3);
+}
+
+.gate-input-prefix {
+    padding: 0 0.8rem;
+    color: var(--neon-green);
+    font-size: 1rem;
+    font-family: 'Share Tech Mono', monospace;
+    border-right: 1px solid rgba(0, 170, 255, 0.2);
+}
+
+.gate-input {
+    flex: 1;
+    padding: 0.9rem 1rem;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--neon-blue);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 1rem;
+    letter-spacing: 0.15em;
+    caret-color: var(--neon-green);
+}
+
+.gate-input::placeholder {
+    color: rgba(0, 130, 200, 0.4);
+    letter-spacing: 0.1em;
+}
+
+.gate-hint {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-align: center;
+    font-family: 'Tajawal', sans-serif;
+    opacity: 0.7;
+}
+
+.gate-btn {
+    width: 100%;
+    padding: 0.9rem;
+    background: transparent;
+    border: 1px solid var(--neon-blue);
+    border-radius: 6px;
+    color: var(--neon-blue);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.95rem;
+    letter-spacing: 0.2em;
+    cursor: pointer;
+    transition: all 0.3s;
+    position: relative;
+    overflow: hidden;
+}
+
+.gate-btn::before {
+    content: '';
+    position: absolute;
+    top: 0; left: -100%;
+    width: 100%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(0, 170, 255, 0.1), transparent);
+    transition: left 0.5s;
+}
+
+.gate-btn:hover {
+    background: rgba(0, 170, 255, 0.1);
+    box-shadow: 0 0 20px rgba(0, 170, 255, 0.3);
+    color: white;
+}
+
+.gate-btn:hover::before {
+    left: 100%;
+}
+
+.gate-btn.decrypting {
+    border-color: var(--neon-green);
+    color: var(--neon-green);
+    animation: decryptingPulse 0.5s ease infinite;
+}
+
+@keyframes decryptingPulse {
+    0%, 100% { box-shadow: 0 0 10px rgba(0, 255, 136, 0.3); }
+    50% { box-shadow: 0 0 25px rgba(0, 255, 136, 0.6); }
+}
+
+.gate-error {
+    color: var(--error);
+    font-size: 0.8rem;
+    letter-spacing: 0.1em;
+    text-align: center;
+}
+
+/* Gate Exit Animation */
+.gate-screen.exiting {
+    animation: gateExit 1s ease forwards;
+}
+
+@keyframes gateExit {
+    0% { opacity: 1; transform: scale(1); }
+    40% { opacity: 1; transform: scale(1.02); filter: brightness(2); }
+    100% { opacity: 0; transform: scale(0.95); pointer-events: none; }
+}
+
+/* Main container entrance */
+.main-entering {
+    animation: mainEnter 0.8s ease forwards;
+    animation-delay: 0.8s;
+    opacity: 0;
+}
+
+@keyframes mainEnter {
+    from { opacity: 0; transform: scale(0.97) translateY(10px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
 }

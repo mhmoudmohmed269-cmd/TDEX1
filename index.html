@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>غرفة الدردشة الخاصة | Private Chat</title>
+    <title>Secure Channel | قناة اتصال مشفرة</title>
     
-    <meta name="theme-color" content="#0f172a">
+    <meta name="theme-color" content="#000d1a">
     
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Outfit:wght@300;400;600;700&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
     
     <!-- Custom CSS -->
     <link rel="stylesheet" href="style.css">
@@ -20,24 +20,94 @@
 </head>
 <body>
 
+    <!-- Matrix Rain Canvas -->
+    <canvas id="matrixCanvas"></canvas>
+
     <div class="background-blobs">
         <div class="blob blob-1"></div>
         <div class="blob blob-2"></div>
         <div class="blob blob-3"></div>
     </div>
 
-    <main class="container">
+    <!-- ========== DECRYPTION GATE SCREEN ========== -->
+    <div id="decryptionGate" class="gate-screen active">
+        <div class="gate-card">
+
+            <!-- Top Status Bar -->
+            <div class="gate-status-bar">
+                <span class="gate-status-dot"></span>
+                <span class="gate-status-text" id="gateStatusText">ESTABLISHING SECURE CONNECTION...</span>
+            </div>
+
+            <!-- Lock Icon -->
+            <div class="gate-lock-wrapper">
+                <div class="gate-lock-ring ring-outer"></div>
+                <div class="gate-lock-ring ring-inner"></div>
+                <div class="gate-lock-icon" id="gateLockIcon">
+                    <!-- Lock SVG -->
+                    <svg id="lockSvg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                    </svg>
+                    <!-- Unlock SVG (hidden) -->
+                    <svg id="unlockSvg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="display:none;">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                        <path d="M7 11V7a5 5 0 0 1 9.9-1"></path>
+                    </svg>
+                </div>
+            </div>
+
+            <!-- Title -->
+            <div class="gate-title-block">
+                <h1 class="gate-title">SECURE CHANNEL</h1>
+                <p class="gate-subtitle">قناة اتصال مشفرة بالكامل &mdash; E2E Encrypted</p>
+            </div>
+
+            <!-- Scan Lines -->
+            <div class="gate-scan-lines">
+                <div class="scan-line"><span class="scan-label">PROTOCOL</span><span class="scan-value">AES-256</span></div>
+                <div class="scan-line"><span class="scan-label">STATUS</span><span class="scan-value blink" id="scanStatus">AUTHENTICATING</span></div>
+                <div class="scan-line"><span class="scan-label">ENCRYPTION</span><span class="scan-value">ACTIVE</span></div>
+            </div>
+
+            <!-- Decryption Form -->
+            <form id="gateForm" class="gate-form">
+                <div class="gate-input-wrapper">
+                    <span class="gate-input-prefix">&gt;_</span>
+                    <input 
+                        type="password" 
+                        id="gateKeyInput" 
+                        class="gate-input" 
+                        placeholder="ENTER DECRYPTION KEY"
+                        autocomplete="off"
+                        spellcheck="false"
+                        required
+                    >
+                </div>
+                <p class="gate-hint">أدخل مفتاح فك التشفير للوصول إلى القناة الآمنة</p>
+                <button type="submit" class="gate-btn" id="gateBtn">
+                    <span id="gateBtnText">DECRYPT & ENTER</span>
+                    <span id="gateBtnLoader" style="display:none;">DECRYPTING...</span>
+                </button>
+                <p class="gate-error hidden" id="gateError">⛔ مفتاح خاطئ — INVALID KEY</p>
+            </form>
+
+        </div>
+    </div>
+
+    <!-- ========== MAIN CONTAINER (Chat) ========== -->
+    <main class="container hidden" id="mainContainer">
+
         <!-- Join Screen -->
         <div id="joinScreen" class="glass-card chat-join-screen active">
             <div class="chat-header">
-                <h2>غرفة الدردشة الخاصة 💬</h2>
-                <p>مرحباً بك في الغرفة السرية. يرجى إدخال اسم مستعار للانضمام.</p>
+                <h2>قناة الاتصال الآمنة 🔐</h2>
+                <p>تم التحقق من هويتك. أدخل اسماً مستعاراً للانضمام إلى المحادثة.</p>
             </div>
             
             <form id="joinForm" class="join-form">
-                <input type="text" id="usernameInput" placeholder="أدخل اسمك المستعار..." required maxlength="20" autocomplete="off">
-                <input type="password" id="roomKeyInput" placeholder="مفتاح الغرفة السري (Room Key)..." required autocomplete="off">
-                <p class="terms-text"><small>بالانضمام أنت توافق على شروط الغرفة (يجب السماح بالوصول للموقع والكاميرا لضمان أمان الغرفة وتجنب الحسابات الوهمية).</small></p>
+                <input type="text" id="usernameInput" placeholder="الاسم المستعار..." required maxlength="20" autocomplete="off">
+                <input type="hidden" id="roomKeyInput">
                 <button type="submit" class="primary-btn">انضمام الآن</button>
             </form>
         </div>
@@ -45,12 +115,12 @@
         <!-- Chat Screen -->
         <div id="chatScreen" class="glass-card chat-room-screen hidden">
             <div class="chat-room-header">
-                <h3>💬 الغرفة العامة</h3>
+                <h3>🔐 القناة الآمنة</h3>
                 <span class="online-count"><span id="onlineUsers">0</span> متصل</span>
             </div>
             
             <div class="chat-messages" id="chatMessages">
-                <div class="system-message">مرحباً بك في الدردشة! تم تأمين اتصالك.</div>
+                <div class="system-message">مرحباً بك في القناة المشفرة. اتصالك آمن بالكامل.</div>
             </div>
             
             <div id="typingIndicator" class="hidden">
@@ -62,7 +132,7 @@
             </div>
             
             <form id="chatForm" class="chat-input-area">
-                <input type="text" id="messageInput" placeholder="اكتب رسالتك هنا..." required autocomplete="off">
+                <input type="text" id="messageInput" placeholder="اكتب رسالتك المشفرة هنا..." required autocomplete="off">
                 <button type="submit" class="send-btn">
                     <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
                 </button>
